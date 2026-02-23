@@ -1,0 +1,167 @@
+{
+  "name": "Video Performance Analyzer",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "video-analyze",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a social media video analysis expert. Analyze the video at this URL: {{ $json.body.videoUrl }}\n\nTarget platform: {{ $json.body.platform }}\nTarget audience age: {{ $json.body.targetAge }}\nTarget audience gender: {{ $json.body.targetGender }}\nTarget tags/interests: {{ $json.body.targetTags.join(', ') }}\n\nBased on the video URL and the target parameters, extract:\n1. Content tags (what the video is about)\n2. Visual style and production quality assessment\n3. Engagement signals (hook strength, call-to-action, trending elements)\n4. Relevance to target audience\n\nPlatform-specific KPIs to evaluate:\n- TikTok: Views, Likes, Comments, Shares, Watch Time, Completion Rate\n- Instagram: Reach, Impressions, Likes, Comments, Saves, Shares  \n- YouTube: Views, Watch Time, Likes, Comments, CTR, Subscriber Gain\n\nRespond ONLY with valid JSON in this format:\n{\n  \"tags\": [\"tag1\", \"tag2\", ...],\n  \"quality_score\": 0-100,\n  \"hook_strength\": 0-100,\n  \"audience_relevance\": 0-100,\n  \"kpis\": [\"KPI1\", \"KPI2\", ...]\n}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "openai-extract",
+      "name": "OpenAI - Extract Tags",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [500, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the OpenAI response and prepare for scoring\nconst input = $input.first().json;\nconst webhookData = $('Webhook').first().json.body;\n\nlet analysis;\ntry {\n  // Extract JSON from the response\n  const content = input.message?.content || input.text || JSON.stringify(input);\n  const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n  analysis = JSON.parse(jsonMatch ? jsonMatch[0] : content);\n} catch (e) {\n  analysis = {\n    tags: [],\n    quality_score: 50,\n    hook_strength: 50,\n    audience_relevance: 50,\n    kpis: []\n  };\n}\n\nreturn [{\n  json: {\n    ...webhookData,\n    analysis\n  }\n}];"
+      },
+      "id": "parse-extraction",
+      "name": "Parse Extraction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a social media performance prediction expert. Based on the following video analysis, predict performance scores for each KPI.\n\nPlatform: {{ $json.platform }}\nVideo Tags: {{ $json.analysis.tags.join(', ') }}\nQuality Score: {{ $json.analysis.quality_score }}/100\nHook Strength: {{ $json.analysis.hook_strength }}/100\nAudience Relevance: {{ $json.analysis.audience_relevance }}/100\nTarget Age: {{ $json.targetAge }}\nTarget Gender: {{ $json.targetGender }}\nTarget Interests: {{ $json.targetTags.join(', ') }}\n\nFor each of the following KPIs, predict:\n- A realistic predicted value (e.g., \"12.5K views\", \"8.2% CTR\")\n- A performance score from 0-100 (where 100 is exceptional viral performance)\n- A brief explanation of why\n\nKPIs to evaluate based on platform:\n- TikTok: Views, Likes, Comments, Shares, Watch Time, Completion Rate\n- Instagram: Reach, Impressions, Likes, Comments, Saves, Shares\n- YouTube: Views, Watch Time, Likes, Comments, CTR, Subscriber Gain\n\nRespond ONLY with valid JSON in this format:\n{\n  \"results\": [\n    {\n      \"kpi_name\": \"Views\",\n      \"predicted_value\": \"15.2K\",\n      \"score\": 72,\n      \"explanation\": \"Strong hook and trending topic should drive above-average views\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "id": "openai-score",
+      "name": "OpenAI - Score KPIs",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [1000, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse scoring response and prepare callback payload\nconst input = $input.first().json;\nconst webhookData = $('Parse Extraction').first().json;\n\nlet scoring;\ntry {\n  const content = input.message?.content || input.text || JSON.stringify(input);\n  const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n  scoring = JSON.parse(jsonMatch ? jsonMatch[0] : content);\n} catch (e) {\n  scoring = { results: [] };\n}\n\nreturn [{\n  json: {\n    requestId: webhookData.requestId,\n    results: scoring.results || []\n  }\n}];"
+      },
+      "id": "parse-scoring",
+      "name": "Parse Scoring",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.APP_CALLBACK_URL || 'http://localhost:3000'}}/api/webhook/results",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.WEBHOOK_SECRET}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "http-callback",
+      "name": "Callback to App",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1500, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\": \"accepted\"}"
+      },
+      "id": "webhook-response",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [500, 500]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          { "node": "OpenAI - Extract Tags", "type": "main", "index": 0 },
+          { "node": "Respond to Webhook", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "OpenAI - Extract Tags": {
+      "main": [
+        [{ "node": "Parse Extraction", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Extraction": {
+      "main": [
+        [{ "node": "OpenAI - Score KPIs", "type": "main", "index": 0 }]
+      ]
+    },
+    "OpenAI - Score KPIs": {
+      "main": [
+        [{ "node": "Parse Scoring", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Scoring": {
+      "main": [
+        [{ "node": "Callback to App", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
