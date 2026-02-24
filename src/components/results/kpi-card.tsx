@@ -2,7 +2,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
 interface KpiCardProps {
@@ -12,46 +11,85 @@ interface KpiCardProps {
   explanation?: string | null
 }
 
-function getScoreColor(score: number) {
-  if (score >= 70) return "text-green-600"
-  if (score >= 40) return "text-yellow-600"
-  return "text-red-600"
+function getScoreConfig(score: number) {
+  if (score >= 70) {
+    return {
+      label: "Strong",
+      labelColor: "text-emerald-400",
+      progressColor: "[&>div]:bg-emerald-500",
+      ringColor: "ring-emerald-500/20",
+      glowColor: "shadow-emerald-500/10",
+      dotColor: "bg-emerald-400",
+    }
+  }
+  if (score >= 40) {
+    return {
+      label: "Average",
+      labelColor: "text-amber-400",
+      progressColor: "[&>div]:bg-amber-500",
+      ringColor: "ring-amber-500/20",
+      glowColor: "shadow-amber-500/10",
+      dotColor: "bg-amber-400",
+    }
+  }
+  return {
+    label: "Low",
+    labelColor: "text-rose-400",
+    progressColor: "[&>div]:bg-rose-500",
+    ringColor: "ring-rose-500/20",
+    glowColor: "shadow-rose-500/10",
+    dotColor: "bg-rose-400",
+  }
 }
 
-function getScoreBadgeVariant(score: number): "default" | "secondary" | "destructive" {
-  if (score >= 70) return "default"
-  if (score >= 40) return "secondary"
-  return "destructive"
+function formatPredictedValue(kpiName: string, value: string): string {
+  if (kpiName === "View Duration") {
+    const ms = Number.parseInt(value.replaceAll(/\D/g, ""), 10)
+    if (Number.isNaN(ms)) return value
+    if (ms < 1000) return `${ms}ms`
+    const s = Math.floor(ms / 1000)
+    if (s < 60) return `${s}s`
+    const m = Math.floor(s / 60)
+    const rem = s % 60
+    return rem > 0 ? `${m}m ${rem}s` : `${m}m`
+  }
+  return value
 }
 
-function getProgressColor(score: number) {
-  if (score >= 70) return "[&>div]:bg-green-500"
-  if (score >= 40) return "[&>div]:bg-yellow-500"
-  return "[&>div]:bg-red-500"
-}
+export function KpiCard({ kpiName, predictedValue, score, explanation }: Readonly<KpiCardProps>) {
+  const config = getScoreConfig(score)
 
-export function KpiCard({ kpiName, predictedValue, score, explanation }: KpiCardProps) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">{kpiName}</CardTitle>
-          <Badge variant={getScoreBadgeVariant(score)}>
-            <span className={cn("font-bold", getScoreColor(score))}>
+    <Card
+      className={cn(
+        "border-border/60 bg-card/80 backdrop-blur-sm transition-all duration-200",
+        "hover:border-border hover:shadow-lg",
+        config.ringColor,
+        config.glowColor,
+        "ring-1"
+      )}
+    >
+      <CardHeader className="pb-2 pt-4 px-4">
+        <div className="flex items-start justify-between gap-2">
+          <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-display">
+            {kpiName}
+          </CardTitle>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className={cn("h-1.5 w-1.5 rounded-full", config.dotColor)} />
+            <span className={cn("text-xs font-bold tabular-nums", config.labelColor)}>
               {score}
             </span>
-            /100
-          </Badge>
+          </div>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-3">
-        <div className="text-2xl font-bold">{predictedValue}</div>
+      <CardContent className="grid gap-3 px-4 pb-4">
+        <div className="text-2xl font-bold font-display tracking-tight">{formatPredictedValue(kpiName, predictedValue)}</div>
         <Progress
           value={score}
-          className={cn("h-2", getProgressColor(score))}
+          className={cn("h-1.5 bg-muted/60", config.progressColor)}
         />
         {explanation && (
-          <p className="text-xs text-muted-foreground">{explanation}</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">{explanation}</p>
         )}
       </CardContent>
     </Card>

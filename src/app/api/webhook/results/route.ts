@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { createClient } from "@/lib/supabase/server"
 import { webhookResultsSchema } from "@/lib/validators"
 
 export async function POST(request: Request) {
@@ -22,39 +22,54 @@ export async function POST(request: Request) {
       )
     }
 
-    const { requestId, results } = parsed.data
-    const supabase = createAdminClient()
+    const { requestId, results, characteristics } = parsed.data
 
-    // Insert all results
+    const supabase = await createClient()
+
+    // Insert all KPI results
+    const rows = results.map((r) => ({
+      request_id: requestId,
+      kpi_name: r.kpi_name,
+      predicted_value: r.predicted_value,
+      score: r.score,
+      explanation: r.explanation || null,
+    }))
+
     const { error: insertError } = await supabase
       .from("analysis_results")
-      .insert(
-        results.map((r) => ({
-          request_id: requestId,
-          kpi_name: r.kpi_name,
-          predicted_value: r.predicted_value,
-          score: r.score,
-          explanation: r.explanation || null,
-        }))
-      )
+      .insert(rows)
 
     if (insertError) {
+      console.error("Insert results error:", insertError)
       return NextResponse.json(
-        { error: "Failed to insert results" },
+        { error: "Failed to insert results", detail: insertError.message },
         { status: 500 }
       )
     }
 
-    // Update request status to completed
-    await supabase
+    // Update request status and store video characteristics
+    const { error: updateError } = await supabase
       .from("analysis_requests")
-      .update({ status: "completed", updated_at: new Date().toISOString() })
+      .update({
+        status: "completed",
+        updated_at: new Date().toISOString(),
+        ...(characteristics ? { characteristics } : {}),
+      })
       .eq("id", requestId)
 
+    if (updateError) {
+      console.error("Update request error:", updateError)
+      return NextResponse.json(
+        { error: "Failed to update request", detail: updateError.message },
+        { status: 500 }
+      )
+    }
+
     return NextResponse.json({ success: true })
-  } catch {
+  } catch (err) {
+    console.error("Webhook error:", err)
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", detail: String(err) },
       { status: 500 }
     )
   }

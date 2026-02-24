@@ -1,18 +1,31 @@
+export const PLATFORM_KPIS = [
+  "Impressions",
+  "Reach",
+  "CPM",
+  "CTR",
+  "CPC",
+  "Completion Rate",
+  "Conversions",
+  "CPA",
+  "ROAS",
+  "View Duration",
+] as const
+
 export const PLATFORMS = {
   tiktok: {
     label: "TikTok",
     value: "tiktok" as const,
-    kpis: ["Views", "Likes", "Comments", "Shares", "Watch Time", "Completion Rate"],
+    kpis: PLATFORM_KPIS,
   },
   instagram: {
     label: "Instagram",
     value: "instagram" as const,
-    kpis: ["Reach", "Impressions", "Likes", "Comments", "Saves", "Shares"],
+    kpis: PLATFORM_KPIS,
   },
   youtube: {
     label: "YouTube",
     value: "youtube" as const,
-    kpis: ["Views", "Watch Time", "Likes", "Comments", "CTR", "Subscriber Gain"],
+    kpis: PLATFORM_KPIS,
   },
 } as const
 

@@ -11,6 +11,7 @@ export type Database = {
     Tables: {
       analysis_requests: {
         Row: {
+          characteristics: Json | null
           created_at: string | null
           error_message: string | null
           id: string
@@ -25,6 +26,7 @@ export type Database = {
           video_url: string
         }
         Insert: {
+          characteristics?: Json | null
           created_at?: string | null
           error_message?: string | null
           id?: string
@@ -39,6 +41,7 @@ export type Database = {
           video_url: string
         }
         Update: {
+          characteristics?: Json | null
           created_at?: string | null
           error_message?: string | null
           id?: string

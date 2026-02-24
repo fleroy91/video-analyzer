@@ -14,12 +14,12 @@ export const analyzeFormSchema = z
     platform: z.enum(["tiktok", "instagram", "youtube"], {
       message: "Please select a platform",
     }),
-    targetAge: z.enum(["13-17", "18-24", "25-34", "35-44", "45-54", "55+"], {
-      message: "Please select an age range",
-    }),
-    targetGender: z.enum(["male", "female", "all"], {
-      message: "Please select a gender",
-    }),
+    targetAge: z
+      .array(z.enum(["13-17", "18-24", "25-34", "35-44", "45-54", "55+"]))
+      .min(1, "Please select at least one age range"),
+    targetGender: z
+      .array(z.enum(["male", "female", "all"]))
+      .min(1, "Please select at least one gender"),
     targetTags: z.string().optional(),
   })
   .refine((data) => data.videoFile || data.videoUrl, {
@@ -34,18 +34,39 @@ export const analyzeApiSchema = z.object({
   videoSource: z.enum(["upload", "link"]),
   platform: z.enum(["tiktok", "instagram", "youtube"]),
   targetAge: z.string(),
-  targetGender: z.enum(["male", "female", "all"]),
+  targetGender: z.string(),
   targetTags: z.array(z.string()).default([]),
 })
 
+const videoCharacteristicsSchema = z.object({
+  tags: z.array(z.string()).optional(),
+  quality_score: z.number().optional(),
+  hook_strength: z.number().optional(),
+  audience_relevance: z.number().optional(),
+  content_summary: z.string().optional(),
+  characteristics: z.object({
+    objective: z.string().optional(),
+    storytelling: z.number().optional(),
+    audio_quality: z.number().optional(),
+    visual_quality: z.number().optional(),
+    editing_pacing: z.number().optional(),
+    audience_awareness: z.number().optional(),
+    cta_present: z.boolean().optional(),
+    lighting: z.number().optional(),
+    stability: z.number().optional(),
+    format_fit: z.number().optional(),
+  }).optional(),
+}).optional()
+
 export const webhookResultsSchema = z.object({
-  requestId: z.string().uuid(),
+  requestId: z.string(),
   results: z.array(
     z.object({
       kpi_name: z.string(),
-      predicted_value: z.string(),
+      predicted_value: z.coerce.string(),
       score: z.number().min(0).max(100),
       explanation: z.string().optional(),
     })
   ),
+  characteristics: videoCharacteristicsSchema,
 })

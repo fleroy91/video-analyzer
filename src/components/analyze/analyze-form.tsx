@@ -26,8 +26,8 @@ export function AnalyzeForm() {
   const [videoFile, setVideoFile] = useState<File | undefined>()
   const [videoUrl, setVideoUrl] = useState("")
   const [platform, setPlatform] = useState<Platform | undefined>()
-  const [targetAge, setTargetAge] = useState("")
-  const [targetGender, setTargetGender] = useState("")
+  const [targetAge, setTargetAge] = useState<string[]>([])
+  const [targetGender, setTargetGender] = useState<string[]>([])
   const [targetTags, setTargetTags] = useState("")
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -104,8 +104,8 @@ export function AnalyzeForm() {
           videoUrl: finalVideoUrl,
           videoSource,
           platform,
-          targetAge,
-          targetGender,
+          targetAge: targetAge.join(", "),
+          targetGender: targetGender.join(", "),
           targetTags: tagsArray,
         }),
       })
@@ -158,8 +158,8 @@ export function AnalyzeForm() {
           <Separator />
 
           <TargetCriteria
-            ageValue={targetAge}
-            genderValue={targetGender}
+            ageValues={targetAge}
+            genderValues={targetGender}
             tagsValue={targetTags}
             onAgeChange={setTargetAge}
             onGenderChange={setTargetGender}
@@ -168,7 +168,7 @@ export function AnalyzeForm() {
             genderError={errors["targetGender"]}
           />
 
-          <Button type="submit" size="lg" disabled={loading} className="w-full">
+          <Button type="submit" size="lg" disabled={loading} className="w-full glow-btn">
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -10,6 +10,7 @@ import { Loader2, CheckCircle2, XCircle, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { KpiCard } from "./kpi-card"
+import { VideoCharacteristicsCard } from "./video-characteristics-card"
 import type { Tables } from "@/types/database"
 
 interface ResultsDisplayProps {
@@ -86,7 +87,7 @@ export function ResultsDisplay({
           <h1 className="text-2xl font-bold">Analysis Results</h1>
           <p className="text-sm text-muted-foreground">
             {platform?.label} &middot;{" "}
-            {new Date(request.created_at!).toLocaleDateString()}
+            {new Date(request.created_at!).toLocaleDateString("en-US")}
           </p>
         </div>
         <Badge
@@ -177,23 +178,25 @@ export function ResultsDisplay({
 
       {/* Results */}
       {isCompleted && results.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-green-500" />
-            <h2 className="text-lg font-semibold">
-              Performance Predictions
-            </h2>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {results.map((result) => (
-              <KpiCard
-                key={result.id}
-                kpiName={result.kpi_name}
-                predictedValue={result.predicted_value}
-                score={result.score ?? 0}
-                explanation={result.explanation}
-              />
-            ))}
+        <div className="space-y-6">
+          <VideoCharacteristicsCard data={request.characteristics} />
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-500" />
+              <h2 className="text-lg font-semibold">Performance Predictions</h2>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {results.map((result) => (
+                <KpiCard
+                  key={result.id}
+                  kpiName={result.kpi_name}
+                  predictedValue={result.predicted_value}
+                  score={result.score ?? 0}
+                  explanation={result.explanation}
+                />
+              ))}
+            </div>
           </div>
         </div>
       )}

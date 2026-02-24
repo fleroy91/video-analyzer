@@ -1,3 +1,5 @@
+import { spawn } from "node:child_process"
+import path from "node:path"
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { analyzeApiSchema } from "@/lib/validators"
@@ -49,30 +51,40 @@ export async function POST(request: Request) {
       )
     }
 
-    // Fire-and-forget: trigger n8n webhook
-    const webhookUrl = process.env.N8N_WEBHOOK_URL
-    if (webhookUrl) {
-      fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          requestId: analysisRequest.id,
-          videoUrl,
-          platform,
-          targetAge,
-          targetGender,
-          targetTags,
-        }),
-      }).catch(() => {
-        // Fire-and-forget — errors logged server-side but don't block response
-      })
+    // Update status to processing
+    await supabase
+      .from("analysis_requests")
+      .update({ status: "processing" })
+      .eq("id", analysisRequest.id)
 
-      // Update status to processing
-      await supabase
-        .from("analysis_requests")
-        .update({ status: "processing" })
-        .eq("id", analysisRequest.id)
-    }
+    // Fire-and-forget: spawn Python analyzer
+    const scriptPath = path.join(process.cwd(), "python", "analyze_video.py")
+    const appUrl = process.env.APP_URL ?? "http://localhost:3000"
+
+    const child = spawn(
+      "uv",
+      [
+        "run",
+        scriptPath,
+        "--request-id", analysisRequest.id,
+        "--video-url", videoUrl,
+        "--platform", platform,
+        "--target-age", targetAge,
+        "--target-gender", targetGender,
+        "--target-tags", targetTags.join(","),
+        "--callback-url", `${appUrl}/api/webhook/results`,
+      ],
+      {
+        detached: true,
+        stdio: "ignore",
+        env: {
+          ...process.env,
+          GEMINI_API_KEY: process.env.GEMINI_API_KEY ?? "",
+          WEBHOOK_SECRET: process.env.N8N_WEBHOOK_SECRET ?? "",
+        },
+      }
+    )
+    child.unref()
 
     return NextResponse.json({ requestId: analysisRequest.id })
   } catch {
