@@ -12,41 +12,215 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [250, 300]
+      "position": [240, 300]
     },
     {
       "parameters": {
-        "jsCode": "// Step 1: Download video from URL and upload to OpenAI Files API\nconst data = $input.first().json.body;\nconst openaiApiKey = $env.OPENAI_API_KEY;\n\nif (!openaiApiKey) throw new Error('OPENAI_API_KEY environment variable is not set');\nif (!data.videoUrl) throw new Error('videoUrl is required');\n\n// Download the video\nconst videoResponse = await fetch(data.videoUrl);\nif (!videoResponse.ok) throw new Error(`Failed to download video: ${videoResponse.status}`);\nconst videoBlob = await videoResponse.blob();\n\n// Derive a clean filename\nconst rawFilename = data.videoUrl.split('/').pop()?.split('?')[0] || 'video.mp4';\nconst filename = rawFilename.includes('.') ? rawFilename : rawFilename + '.mp4';\n\n// Upload to OpenAI Files API with purpose=vision\nconst formData = new FormData();\nformData.append('file', videoBlob, filename);\nformData.append('purpose', 'vision');\n\nconst uploadResponse = await fetch('https://api.openai.com/v1/files', {\n  method: 'POST',\n  headers: { 'Authorization': `Bearer ${openaiApiKey}` },\n  body: formData\n});\n\nif (!uploadResponse.ok) {\n  const errBody = await uploadResponse.text();\n  throw new Error(`OpenAI file upload failed: ${uploadResponse.status} - ${errBody}`);\n}\n\nconst fileData = await uploadResponse.json();\nif (!fileData.id) throw new Error(`OpenAI file upload returned no id: ${JSON.stringify(fileData)}`);\n\nreturn [{\n  json: {\n    requestId: data.requestId,\n    videoUrl: data.videoUrl,\n    platform: data.platform,\n    targetAge: data.targetAge,\n    targetGender: data.targetGender,\n    targetTags: data.targetTags || [],\n    openaiFileId: fileData.id\n  }\n}];"
+        "jsCode": "const items = $input.all();\nreturn items.map(item => ({\n  json: {\n    ...item.json,\n    GEMINI_API_KEY: \"your-gemini-api-key-here\",\n    APP_CALLBACK_URL: \"http://localhost:3000\"\n  }\n}));"
       },
-      "id": "upload-to-openai",
-      "name": "Upload to OpenAI Files",
+      "id": "secrets-node",
+      "name": "Secrets",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [500, 300]
+      "position": [460, 300]
     },
     {
       "parameters": {
-        "jsCode": "// Step 2: Use the OpenAI file_id to extract video tags and quality signals\nconst data = $input.first().json;\nconst openaiApiKey = $env.OPENAI_API_KEY;\n\nconst platformKpis = {\n  tiktok: ['Views', 'Likes', 'Comments', 'Shares', 'Watch Time', 'Completion Rate'],\n  instagram: ['Reach', 'Impressions', 'Likes', 'Comments', 'Saves', 'Shares'],\n  youtube: ['Views', 'Watch Time', 'Likes', 'Comments', 'CTR', 'Subscriber Gain']\n};\nconst kpis = platformKpis[data.platform] || platformKpis.tiktok;\n\nconst prompt = `You are a social media video analysis expert.\n\nTarget platform: ${data.platform}\nTarget audience age: ${data.targetAge}\nTarget audience gender: ${data.targetGender}\nTarget interests: ${(data.targetTags || []).join(', ') || 'none'}\nKPIs to evaluate: ${kpis.join(', ')}\n\nAnalyze this video and extract:\n1. Content tags (topics, themes, visual style, audio, mood)\n2. Production quality (lighting, editing, clarity)\n3. Hook strength (how engaging are the first 3 seconds)\n4. Audience relevance to the target demographic\n\nRespond ONLY with valid JSON (no markdown):\n{\n  \"tags\": [\"tag1\", \"tag2\"],\n  \"quality_score\": 75,\n  \"hook_strength\": 80,\n  \"audience_relevance\": 70,\n  \"content_summary\": \"brief description\"\n}`;\n\nconst response = await fetch('https://api.openai.com/v1/responses', {\n  method: 'POST',\n  headers: {\n    'Authorization': `Bearer ${openaiApiKey}`,\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({\n    model: 'gpt-4.1',\n    input: [{\n      role: 'user',\n      content: [\n        { type: 'input_text', text: prompt },\n        { type: 'input_image', file_id: data.openaiFileId }\n      ]\n    }]\n  })\n});\n\nif (!response.ok) {\n  const errBody = await response.text();\n  throw new Error(`OpenAI Responses API (extract) failed: ${response.status} - ${errBody}`);\n}\n\nconst result = await response.json();\nconst content = result.output_text\n  || result.output?.[0]?.content?.[0]?.text\n  || result.choices?.[0]?.message?.content\n  || '';\n\nlet analysis;\ntry {\n  const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n  analysis = JSON.parse(jsonMatch ? jsonMatch[0] : content);\n} catch (e) {\n  analysis = { tags: [], quality_score: 50, hook_strength: 50, audience_relevance: 50, content_summary: 'Parse error' };\n}\n\nreturn [{ json: { ...data, analysis } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "inject-gemini-key",
+              "name": "geminiApiKey",
+              "value": "={{ $('Secrets').item.json.GEMINI_API_KEY }}",
+              "type": "string"
+            },
+            {
+              "id": "inject-request-id",
+              "name": "requestId",
+              "value": "={{ $json.body.requestId }}",
+              "type": "string"
+            },
+            {
+              "id": "inject-video-url",
+              "name": "videoUrl",
+              "value": "={{ $json.body.videoUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "inject-platform",
+              "name": "platform",
+              "value": "={{ $json.body.platform }}",
+              "type": "string"
+            },
+            {
+              "id": "inject-target-age",
+              "name": "targetAge",
+              "value": "={{ $json.body.targetAge }}",
+              "type": "string"
+            },
+            {
+              "id": "inject-target-gender",
+              "name": "targetGender",
+              "value": "={{ $json.body.targetGender }}",
+              "type": "string"
+            },
+            {
+              "id": "inject-target-tags",
+              "name": "targetTags",
+              "value": "={{ $json.body.targetTags }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
       },
-      "id": "extract-tags",
-      "name": "Extract Tags",
+      "id": "inject-credentials",
+      "name": "Inject Credentials",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.videoUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "download-video",
+      "name": "Download Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=media&key=' + $('Inject Credentials').item.json.geminiApiKey }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "video/mp4"
+            },
+            {
+              "name": "X-Goog-Upload-Protocol",
+              "value": "raw"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "upload-to-gemini",
+      "name": "Upload to Gemini Files",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "wait-for-processing",
+      "name": "Wait for Processing",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Gemini extract request using uploaded file URI\nconst uploadResult = $input.first().json;\nconst creds = $('Inject Credentials').item.json;\n\nconst fileUri = uploadResult.file?.uri;\nconst mimeType = uploadResult.file?.mimeType || 'video/mp4';\n\nif (!fileUri) throw new Error('No file URI from Gemini upload: ' + JSON.stringify(uploadResult));\n\nconst kpis = ['Impressions', 'Reach', 'CPM', 'CTR', 'CPC', 'Completion Rate', 'Conversions', 'CPA', 'ROAS', 'View Duration'];\n\nconst prompt = `You are a social media video analysis expert.\n\nTarget platform: ${creds.platform}\nTarget audience age: ${creds.targetAge}\nTarget audience gender: ${creds.targetGender}\nTarget interests: ${(creds.targetTags || []).join(', ') || 'none'}\nKPIs to evaluate: ${kpis.join(', ')}\n\nWatch this video carefully and extract:\n1. Content tags (topics, themes, visual style, audio, mood)\n2. Production quality (lighting, editing, clarity) - score 0-100\n3. Hook strength (how engaging are the first 3 seconds) - score 0-100\n4. Audience relevance to the target demographic - score 0-100\n\nRespond ONLY with valid JSON (no markdown):\n{\n  \"tags\": [\"tag1\", \"tag2\"],\n  \"quality_score\": 75,\n  \"hook_strength\": 80,\n  \"audience_relevance\": 70,\n  \"content_summary\": \"brief description\"\n}`;\n\nconst requestBody = JSON.stringify({\n  contents: [{\n    parts: [\n      { text: prompt },\n      { fileData: { mimeType, fileUri } }\n    ]\n  }],\n  generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }\n});\n\nreturn [{\n  json: {\n    geminiApiKey: creds.geminiApiKey,\n    requestId: creds.requestId,\n    platform: creds.platform,\n    targetAge: creds.targetAge,\n    targetGender: creds.targetGender,\n    targetTags: creds.targetTags || [],\n    videoUrl: creds.videoUrl,\n    requestBody\n  }\n}];"
+      },
+      "id": "build-gemini-extract-request",
+      "name": "Build Gemini Extract Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [750, 300]
+      "position": [1560, 300]
     },
     {
       "parameters": {
-        "jsCode": "// Step 3: Predict KPI performance scores from the extracted analysis\nconst data = $input.first().json;\nconst openaiApiKey = $env.OPENAI_API_KEY;\n\nconst platformKpis = {\n  tiktok: ['Views', 'Likes', 'Comments', 'Shares', 'Watch Time', 'Completion Rate'],\n  instagram: ['Reach', 'Impressions', 'Likes', 'Comments', 'Saves', 'Shares'],\n  youtube: ['Views', 'Watch Time', 'Likes', 'Comments', 'CTR', 'Subscriber Gain']\n};\nconst kpis = platformKpis[data.platform] || platformKpis.tiktok;\nconst analysis = data.analysis || {};\n\nconst prompt = `You are a social media performance prediction expert for ${data.platform}.\n\nVideo analysis:\n- Summary: ${analysis.content_summary || 'N/A'}\n- Tags: ${(analysis.tags || []).join(', ') || 'N/A'}\n- Production quality: ${analysis.quality_score || 50}/100\n- Hook strength: ${analysis.hook_strength || 50}/100\n- Audience relevance: ${analysis.audience_relevance || 50}/100\n\nTarget audience:\n- Platform: ${data.platform}\n- Age: ${data.targetAge}\n- Gender: ${data.targetGender}\n- Interests: ${(data.targetTags || []).join(', ') || 'none'}\n\nFor each KPI, predict realistic performance for a new creator account posting this video:\n- predicted_value: realistic value with units (e.g. \"8.5K\", \"3.2%\", \"0:42\")\n- score: 0-100 (50=average, 80+=strong, 100=viral)\n- explanation: one sentence\n\nKPIs: ${kpis.join(', ')}\n\nRespond ONLY with valid JSON (no markdown):\n{\n  \"results\": [\n    { \"kpi_name\": \"Views\", \"predicted_value\": \"15.2K\", \"score\": 72, \"explanation\": \"Strong hook should drive above-average initial views.\" }\n  ]\n}`;\n\nconst response = await fetch('https://api.openai.com/v1/responses', {\n  method: 'POST',\n  headers: {\n    'Authorization': `Bearer ${openaiApiKey}`,\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({\n    model: 'gpt-4.1',\n    input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }] }]\n  })\n});\n\nif (!response.ok) {\n  const errBody = await response.text();\n  throw new Error(`OpenAI Responses API (score) failed: ${response.status} - ${errBody}`);\n}\n\nconst result = await response.json();\nconst content = result.output_text\n  || result.output?.[0]?.content?.[0]?.text\n  || result.choices?.[0]?.message?.content\n  || '';\n\nlet scoring;\ntry {\n  const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n  scoring = JSON.parse(jsonMatch ? jsonMatch[0] : content);\n} catch (e) {\n  scoring = { results: [] };\n}\n\nreturn [{ json: { requestId: data.requestId, results: scoring.results || [] } }];"
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + $json.geminiApiKey }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {}
       },
-      "id": "score-kpis",
-      "name": "Score KPIs",
+      "id": "gemini-extract-tags",
+      "name": "Gemini Extract Tags",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Gemini extract response and build Score KPIs request\nconst apiResponse = $input.first().json;\nconst prevData = $('Build Gemini Extract Request').item.json;\n\nconst content = apiResponse.candidates?.[0]?.content?.parts?.[0]?.text || '';\n\nlet analysis;\ntry {\n  const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n  analysis = JSON.parse(jsonMatch ? jsonMatch[0] : content);\n} catch (e) {\n  analysis = { tags: [], quality_score: 50, hook_strength: 50, audience_relevance: 50, content_summary: 'Parse error' };\n}\n\nconst kpis = ['Impressions', 'Reach', 'CPM', 'CTR', 'CPC', 'Completion Rate', 'Conversions', 'CPA', 'ROAS', 'View Duration'];\n\nconst scorePrompt = `You are a social media performance prediction expert for ${prevData.platform}.\n\nVideo analysis:\n- Summary: ${analysis.content_summary || 'N/A'}\n- Tags: ${(analysis.tags || []).join(', ') || 'N/A'}\n- Production quality: ${analysis.quality_score || 50}/100\n- Hook strength: ${analysis.hook_strength || 50}/100\n- Audience relevance: ${analysis.audience_relevance || 50}/100\n\nTarget audience:\n- Platform: ${prevData.platform}\n- Age: ${prevData.targetAge}\n- Gender: ${prevData.targetGender}\n- Interests: ${(prevData.targetTags || []).join(', ') || 'none'}\n\nFor each KPI, predict realistic performance for a new creator account posting this video:\n- predicted_value: realistic value with units (e.g. \"8.5K\", \"3.2%\", \"$0.45\")\n- For \"View Duration\" specifically: return the value as an integer number of milliseconds only, no units (e.g. \"45000\" means 45 seconds watched)\n- score: 0-100 (50=average, 80+=strong, 100=viral)\n- explanation: one sentence\n\nKPIs: ${kpis.join(', ')}\n\nRespond ONLY with valid JSON (no markdown):\n{\n  \"results\": [\n    { \"kpi_name\": \"Impressions\", \"predicted_value\": \"12.5K\", \"score\": 68, \"explanation\": \"Good hook will drive solid impression volume.\" }\n  ]\n}`;\n\nconst requestBody = JSON.stringify({\n  contents: [{ parts: [{ text: scorePrompt }] }],\n  generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }\n});\n\nreturn [{\n  json: {\n    geminiApiKey: prevData.geminiApiKey,\n    requestId: prevData.requestId,\n    requestBody\n  }\n}];"
+      },
+      "id": "build-gemini-score-request",
+      "name": "Build Gemini Score Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1000, 300]
+      "position": [2000, 300]
     },
     {
       "parameters": {
-        "url": "={{$env.APP_CALLBACK_URL || 'http://localhost:3000'}}/api/webhook/results",
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + $json.geminiApiKey }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "id": "gemini-score-kpis",
+      "name": "Gemini Score KPIs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse final Gemini KPI scores\nconst apiResponse = $input.first().json;\nconst requestId = $('Build Gemini Score Request').item.json.requestId;\n\nconst content = apiResponse.candidates?.[0]?.content?.parts?.[0]?.text || '';\n\nlet scoring;\ntry {\n  const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n  scoring = JSON.parse(jsonMatch ? jsonMatch[0] : content);\n} catch (e) {\n  scoring = { results: [] };\n}\n\nreturn [{ json: { requestId, results: scoring.results || [] } }];"
+      },
+      "id": "parse-score-response",
+      "name": "Parse Score Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2440, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Secrets').item.json.APP_CALLBACK_URL || 'http://localhost:3000' }}/api/webhook/results",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -65,26 +239,61 @@
       "name": "Callback to App",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1250, 300]
+      "position": [2660, 300]
     }
   ],
   "connections": {
     "Webhook": {
       "main": [
-        [{ "node": "Upload to OpenAI Files", "type": "main", "index": 0 }]
+        [{ "node": "Secrets", "type": "main", "index": 0 }]
       ]
     },
-    "Upload to OpenAI Files": {
+    "Secrets": {
       "main": [
-        [{ "node": "Extract Tags", "type": "main", "index": 0 }]
+        [{ "node": "Inject Credentials", "type": "main", "index": 0 }]
       ]
     },
-    "Extract Tags": {
+    "Inject Credentials": {
       "main": [
-        [{ "node": "Score KPIs", "type": "main", "index": 0 }]
+        [{ "node": "Download Video", "type": "main", "index": 0 }]
       ]
     },
-    "Score KPIs": {
+    "Download Video": {
+      "main": [
+        [{ "node": "Upload to Gemini Files", "type": "main", "index": 0 }]
+      ]
+    },
+    "Upload to Gemini Files": {
+      "main": [
+        [{ "node": "Wait for Processing", "type": "main", "index": 0 }]
+      ]
+    },
+    "Wait for Processing": {
+      "main": [
+        [{ "node": "Build Gemini Extract Request", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Gemini Extract Request": {
+      "main": [
+        [{ "node": "Gemini Extract Tags", "type": "main", "index": 0 }]
+      ]
+    },
+    "Gemini Extract Tags": {
+      "main": [
+        [{ "node": "Build Gemini Score Request", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Gemini Score Request": {
+      "main": [
+        [{ "node": "Gemini Score KPIs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Gemini Score KPIs": {
+      "main": [
+        [{ "node": "Parse Score Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Score Response": {
       "main": [
         [{ "node": "Callback to App", "type": "main", "index": 0 }]
       ]
