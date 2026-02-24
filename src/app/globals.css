@@ -240,3 +240,21 @@
 .score-green  { color: oklch(0.82 0.2 130); }
 .score-yellow { color: oklch(0.82 0.18 85); }
 .score-red    { color: oklch(0.714 0.134 225); }
+
+/* Override browser autofill / password-manager background injection */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px oklch(0.93 0.012 255) inset !important;
+  -webkit-text-fill-color: oklch(0.15 0.025 255) !important;
+  caret-color: oklch(0.15 0.025 255);
+}
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px oklch(0.23 0.025 255) inset !important;
+  -webkit-text-fill-color: oklch(0.96 0.012 255) !important;
+  caret-color: oklch(0.96 0.012 255);
+}
