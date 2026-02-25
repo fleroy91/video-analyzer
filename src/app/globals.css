@@ -145,6 +145,15 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Light inputs use light color scheme; dark inputs use dark —
+     this tells password managers (1Password, etc.) which fill
+     colors to use for their autofill indicator. */
+  input, textarea, select {
+    color-scheme: light;
+  }
+  .dark input, .dark textarea, .dark select {
+    color-scheme: dark;
+  }
 }
 
 /* ─── Utility Classes ─────────────────────────────── */
@@ -241,12 +250,15 @@
 .score-yellow { color: oklch(0.82 0.18 85); }
 .score-red    { color: oklch(0.714 0.134 225); }
 
-/* Override browser autofill / password-manager background injection */
+/* Override browser / password-manager autofill background.
+   background-image gradient beats 1Password's fill indicator;
+   box-shadow covers native browser autofill blue. */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
   -webkit-box-shadow: 0 0 0 1000px oklch(0.93 0.012 255) inset !important;
+  background-image: linear-gradient(oklch(0.93 0.012 255), oklch(0.93 0.012 255)) !important;
   -webkit-text-fill-color: oklch(0.15 0.025 255) !important;
   caret-color: oklch(0.15 0.025 255);
 }
@@ -255,6 +267,7 @@ input:-webkit-autofill:active {
 .dark input:-webkit-autofill:focus,
 .dark input:-webkit-autofill:active {
   -webkit-box-shadow: 0 0 0 1000px oklch(0.23 0.025 255) inset !important;
+  background-image: linear-gradient(oklch(0.23 0.025 255), oklch(0.23 0.025 255)) !important;
   -webkit-text-fill-color: oklch(0.96 0.012 255) !important;
   caret-color: oklch(0.96 0.012 255);
 }

@@ -105,18 +105,28 @@ export function VideoCharacteristicsCard({ data }: VideoCharacteristicsCardProps
       </CardHeader>
       <CardContent className="px-4 pb-4 space-y-4">
         {content_summary && (
-          <p className="text-sm text-muted-foreground leading-relaxed border-l-2 border-border pl-3">
-            {content_summary}
-          </p>
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Summary
+            </p>
+            <p className="text-sm text-foreground/80 leading-relaxed border-l-2 border-primary/40 pl-3">
+              {content_summary}
+            </p>
+          </div>
         )}
 
         {tags && tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {tags.map((tag) => (
-              <Badge key={tag} variant="outline" className="text-xs font-normal">
-                {tag}
-              </Badge>
-            ))}
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Topics
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {tags.map((tag) => (
+                <Badge key={tag} variant="secondary" className="text-xs font-normal">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
           </div>
         )}
 

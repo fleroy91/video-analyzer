@@ -74,7 +74,7 @@ export default function SignUpPage() {
                 id="displayName"
                 name="displayName"
                 placeholder="Your name"
-                className="bg-secondary/50 border-border/60 focus:border-primary/60"
+                className="border-border/60"
                 required
               />
             </div>
@@ -85,7 +85,7 @@ export default function SignUpPage() {
                 name="email"
                 type="email"
                 placeholder="you@example.com"
-                className="bg-secondary/50 border-border/60 focus:border-primary/60"
+                className="border-border/60"
                 required
               />
             </div>
@@ -96,7 +96,7 @@ export default function SignUpPage() {
                 name="password"
                 type="password"
                 minLength={6}
-                className="bg-secondary/50 border-border/60 focus:border-primary/60"
+                className="border-border/60"
                 required
               />
             </div>

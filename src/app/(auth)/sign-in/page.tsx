@@ -1,13 +1,13 @@
-"use client"
+'use client'
 
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { toast } from "sonner"
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { toast } from 'sonner'
 
 export default function SignInPage() {
   const router = useRouter()
@@ -18,11 +18,14 @@ export default function SignInPage() {
     setLoading(true)
 
     const formData = new FormData(e.currentTarget)
-    const email = formData.get("email") as string
-    const password = formData.get("password") as string
+    const email = formData.get('email') as string
+    const password = formData.get('password') as string
 
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
 
     if (error) {
       toast.error(error.message)
@@ -30,7 +33,7 @@ export default function SignInPage() {
       return
     }
 
-    router.push("/analyze")
+    router.push('/analyze')
     router.refresh()
   }
 
@@ -49,38 +52,53 @@ export default function SignInPage() {
                 strokeLinejoin="round"
               />
               <defs>
-                <linearGradient id="grad-auth" x1="2" y1="10.5" x2="11" y2="5" gradientUnits="userSpaceOnUse">
+                <linearGradient
+                  id="grad-auth"
+                  x1="2"
+                  y1="10.5"
+                  x2="11"
+                  y2="5"
+                  gradientUnits="userSpaceOnUse"
+                >
                   <stop stopColor="oklch(0.623 0.17 253)" />
                   <stop offset="1" stopColor="oklch(0.714 0.134 225)" />
                 </linearGradient>
               </defs>
             </svg>
           </div>
-          <h1 className="font-display text-2xl font-bold gradient-text">VideoAnalyzer</h1>
-          <p className="text-sm text-muted-foreground">Sign in to your account</p>
+          <h1 className="font-display text-2xl font-bold gradient-text">
+            VideoAnalyzer
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Sign in to your account
+          </p>
         </div>
 
         {/* Form card */}
         <div className="rounded-2xl border border-border/60 bg-card/60 backdrop-blur-sm p-6 shadow-xl shadow-black/20">
           <form onSubmit={handleSubmit} className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+              <Label htmlFor="email" className="text-sm font-medium">
+                Email
+              </Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
                 placeholder="you@example.com"
-                className="bg-secondary/50 border-border/60 focus:border-primary/60"
+                className="border-border/60"
                 required
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+              <Label htmlFor="password" className="text-sm font-medium">
+                Password
+              </Label>
               <Input
                 id="password"
                 name="password"
                 type="password"
-                className="bg-secondary/50 border-border/60 focus:border-primary/60"
+                className="border-border/60"
                 required
               />
             </div>
@@ -89,11 +107,11 @@ export default function SignInPage() {
               className="w-full mt-2 glow-btn font-semibold"
               disabled={loading}
             >
-              {loading ? "Signing in..." : "Sign In"}
+              {loading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
           <p className="mt-5 text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
+            Don&apos;t have an account?{' '}
             <Link
               href="/sign-up"
               className="text-primary font-medium hover:underline underline-offset-4 transition-colors"
