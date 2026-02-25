@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { Syne, DM_Sans, Geist_Mono } from "next/font/google"
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/theme-provider"
+import { FaroProvider } from "@/components/faro-provider"
 import "./globals.css"
 
 const syne = Syne({
@@ -41,6 +42,7 @@ export default function RootLayout({
         className={`${syne.variable} ${dmSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
+        <FaroProvider />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           {children}
           <Toaster />

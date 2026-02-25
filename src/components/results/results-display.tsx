@@ -45,7 +45,9 @@ export function ResultsDisplay({
           setRequest(payload.new as Tables<"analysis_requests">)
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        if (status === "CHANNEL_ERROR") console.error("[Realtime] request channel error:", err)
+      })
 
     // Subscribe to new results
     const resultsChannel = supabase
@@ -62,7 +64,9 @@ export function ResultsDisplay({
           setResults((prev) => [...prev, payload.new as Tables<"analysis_results">])
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        if (status === "CHANNEL_ERROR") console.error("[Realtime] results channel error:", err)
+      })
 
     return () => {
       supabase.removeChannel(requestChannel)

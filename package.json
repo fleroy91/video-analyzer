@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@grafana/faro-react": "^2.2.4",
+    "@grafana/faro-web-sdk": "^2.2.4",
     "@hookform/resolvers": "^5.2.2",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.97.0",

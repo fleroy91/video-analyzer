@@ -50,4 +50,5 @@ Social media video performance analyzer — users upload a video (or paste a URL
 ## Environment variables
 - `GEMINI_API_KEY` — Google Gemini API key (required for pipeline)
 - `SUPABASE_SERVICE_ROLE_KEY` — service role key for admin client (used by pipeline)
+- `NEXT_PUBLIC_GRAFANA_FARO_URL` — Grafana Faro collector URL for frontend observability (optional)
 - Supabase vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`

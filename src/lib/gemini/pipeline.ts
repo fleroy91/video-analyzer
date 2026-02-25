@@ -217,11 +217,15 @@ export interface PipelineParams {
   targetTags: string[]
 }
 
-async function updateStep(requestId: string, step: PipelineStep): Promise<void> {
+async function updateStep(
+  requestId: string,
+  step: PipelineStep,
+  extra?: { status?: string },
+): Promise<void> {
   const supabase = createAdminClient()
   await supabase
     .from("analysis_requests")
-    .update({ pipeline_step: step })
+    .update({ pipeline_step: step, ...extra })
     .eq("id", requestId)
 }
 
@@ -234,7 +238,7 @@ export async function runGeminiPipeline(params: PipelineParams): Promise<void> {
 
   // 1. Download
   console.log(`${tag} [1/5] Downloading video...`)
-  await updateStep(requestId, "downloading")
+  await updateStep(requestId, "downloading", { status: "processing" })
   const { data, mimeType } = await downloadVideo(videoUrl)
   console.log(`${tag}       ${(data.byteLength / 1024 / 1024).toFixed(1)} MB  (${mimeType})`)
 
