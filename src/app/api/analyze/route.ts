@@ -1,5 +1,3 @@
-import { spawn } from "node:child_process"
-import path from "node:path"
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { analyzeApiSchema } from "@/lib/validators"
@@ -28,7 +26,7 @@ export async function POST(request: Request) {
     const { videoUrl, videoSource, platform, targetAge, targetGender, targetTags } =
       parsed.data
 
-    // Create analysis request record
+    // Create analysis request record (status starts as "processing")
     const { data: analysisRequest, error: insertError } = await supabase
       .from("analysis_requests")
       .insert({
@@ -39,7 +37,7 @@ export async function POST(request: Request) {
         target_age: targetAge,
         target_gender: targetGender,
         target_tags: targetTags,
-        status: "pending",
+        status: "processing",
       })
       .select("id")
       .single()
@@ -51,40 +49,24 @@ export async function POST(request: Request) {
       )
     }
 
-    // Update status to processing
-    await supabase
-      .from("analysis_requests")
-      .update({ status: "processing" })
-      .eq("id", analysisRequest.id)
+    // Derive base URL from the incoming request so it works in every environment
+    const { origin } = new URL(request.url)
+    const appUrl = process.env.APP_URL ?? origin
 
-    // Fire-and-forget: spawn Python analyzer
-    const scriptPath = path.join(process.cwd(), "python", "analyze_video.py")
-    const appUrl = process.env.APP_URL ?? "http://localhost:3000"
-
-    const child = spawn(
-      "uv",
-      [
-        "run",
-        scriptPath,
-        "--request-id", analysisRequest.id,
-        "--video-url", videoUrl,
-        "--platform", platform,
-        "--target-age", targetAge,
-        "--target-gender", targetGender,
-        "--target-tags", targetTags.join(","),
-        "--callback-url", `${appUrl}/api/webhook/results`,
-      ],
-      {
-        detached: true,
-        stdio: "ignore",
-        env: {
-          ...process.env,
-          GEMINI_API_KEY: process.env.GEMINI_API_KEY ?? "",
-          WEBHOOK_SECRET: process.env.N8N_WEBHOOK_SECRET ?? "",
-        },
-      }
-    )
-    child.unref()
+    // Fire-and-forget: trigger the worker (TypeScript Gemini pipeline)
+    fetch(`${appUrl}/api/analyze/worker`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requestId: analysisRequest.id,
+        videoUrl,
+        platform,
+        targetAge,
+        targetGender,
+        targetTags,
+        callbackUrl: `${appUrl}/api/webhook/results`,
+      }),
+    }).catch((err) => console.error("[analyze] Failed to trigger worker:", err))
 
     return NextResponse.json({ requestId: analysisRequest.id })
   } catch {
