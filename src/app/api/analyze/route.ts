@@ -1,7 +1,10 @@
-import { NextResponse } from "next/server"
+import { after, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { analyzeApiSchema } from "@/lib/validators"
 import { runGeminiPipeline } from "@/lib/gemini/pipeline"
+
+export const maxDuration = 300
 
 export async function POST(request: Request) {
   const start = Date.now()
@@ -62,15 +65,19 @@ export async function POST(request: Request) {
     const { id: requestId } = analysisRequest
     console.log(`[analyze] Request created — id=${requestId} (${Date.now() - start}ms)`)
 
-    // Fire-and-forget: run pipeline directly, saves results to Supabase
-    runGeminiPipeline({ requestId, videoUrl, platform, targetAge, targetGender, targetTags })
-      .catch(async (err) => {
+    // Run pipeline after response is sent (keeps serverless function alive on Vercel)
+    after(async () => {
+      try {
+        await runGeminiPipeline({ requestId, videoUrl, platform, targetAge, targetGender, targetTags })
+      } catch (err) {
         console.error(`[analyze] Pipeline failed for ${requestId}:`, err)
-        await supabase
+        const admin = createAdminClient()
+        await admin
           .from("analysis_requests")
           .update({ status: "failed", error_message: String(err) })
           .eq("id", requestId)
-      })
+      }
+    })
 
     console.log(`[analyze] Pipeline launched — responding in ${Date.now() - start}ms`)
     return NextResponse.json({ requestId })
