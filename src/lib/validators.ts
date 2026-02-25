@@ -38,35 +38,3 @@ export const analyzeApiSchema = z.object({
   targetTags: z.array(z.string()).default([]),
 })
 
-const videoCharacteristicsSchema = z.object({
-  tags: z.array(z.string()).optional(),
-  quality_score: z.number().optional(),
-  hook_strength: z.number().optional(),
-  audience_relevance: z.number().optional(),
-  content_summary: z.string().optional(),
-  characteristics: z.object({
-    objective: z.string().optional(),
-    storytelling: z.number().optional(),
-    audio_quality: z.number().optional(),
-    visual_quality: z.number().optional(),
-    editing_pacing: z.number().optional(),
-    audience_awareness: z.number().optional(),
-    cta_present: z.boolean().optional(),
-    lighting: z.number().optional(),
-    stability: z.number().optional(),
-    format_fit: z.number().optional(),
-  }).optional(),
-}).optional()
-
-export const webhookResultsSchema = z.object({
-  requestId: z.string(),
-  results: z.array(
-    z.object({
-      kpi_name: z.string(),
-      predicted_value: z.coerce.string(),
-      score: z.number().min(0).max(100),
-      explanation: z.string().optional(),
-    })
-  ),
-  characteristics: videoCharacteristicsSchema,
-})

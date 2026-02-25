@@ -14,6 +14,7 @@ import { useEffect, useState } from "react"
 
 export function UserMenu() {
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
   const [initials, setInitials] = useState("")
 
   useEffect(() => {
@@ -30,6 +31,8 @@ export function UserMenu() {
             .slice(0, 2)
         )
       }
+    }).finally(() => {
+      setMounted(true)
     })
   }, [])
 
@@ -38,6 +41,18 @@ export function UserMenu() {
     await supabase.auth.signOut()
     router.push("/sign-in")
     router.refresh()
+  }
+
+  if (!mounted) {
+    return (
+      <button className="rounded-full outline-none ring-ring focus-visible:ring-2">
+        <Avatar className="h-8 w-8">
+          <AvatarFallback className="text-xs">
+            <User className="h-4 w-4" />
+          </AvatarFallback>
+        </Avatar>
+      </button>
+    )
   }
 
   return (

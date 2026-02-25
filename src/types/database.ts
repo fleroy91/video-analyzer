@@ -15,6 +15,7 @@ export type Database = {
           created_at: string | null
           error_message: string | null
           id: string
+          pipeline_step: string | null
           platform: string
           status: string
           target_age: string
@@ -30,6 +31,7 @@ export type Database = {
           created_at?: string | null
           error_message?: string | null
           id?: string
+          pipeline_step?: string | null
           platform: string
           status?: string
           target_age: string
@@ -45,6 +47,7 @@ export type Database = {
           created_at?: string | null
           error_message?: string | null
           id?: string
+          pipeline_step?: string | null
           platform?: string
           status?: string
           target_age?: string

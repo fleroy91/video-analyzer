@@ -24,10 +24,9 @@ Social media video performance analyzer — users upload a video (or paste a URL
   - `(auth)/` — sign-in / sign-up pages
   - `(dashboard)/` — main app (analyze, history, results/[id])
   - `api/analyze/` — POST endpoint: creates DB record, fires Gemini pipeline
-  - `api/webhook/results/` — callback that stores pipeline results
 - `src/components/` — React components (shadcn `ui/`, feature folders)
 - `src/lib/` — shared logic
-  - `gemini/pipeline.ts` — full Gemini video analysis pipeline (download → upload → extract → score → callback)
+  - `gemini/pipeline.ts` — full Gemini video analysis pipeline (download → upload → extract → score → save to DB)
   - `supabase/` — client/server/admin Supabase helpers
   - `validators.ts` — Zod schemas for forms & API
   - `constants.ts` — platforms, KPIs, age ranges, genders
@@ -37,9 +36,8 @@ Social media video performance analyzer — users upload a video (or paste a URL
 ## Data flow
 1. User submits video via `/analyze` form
 2. `POST /api/analyze` creates an `analysis_requests` row (status: processing), then fire-and-forgets `runGeminiPipeline`
-3. Pipeline: download video → upload to Gemini Files API → poll until ACTIVE → extract characteristics → score KPIs → POST results to webhook callback
-4. `POST /api/webhook/results` inserts `analysis_results` rows, updates request status to "completed", stores characteristics
-5. Frontend polls / uses Realtime to show results on `/results/[id]`
+3. Pipeline: download video → upload to Gemini Files API → poll until ACTIVE → extract characteristics → score KPIs → save results directly to Supabase
+4. Frontend receives updates via Supabase Realtime (pipeline step progress + results) on `/results/[id]`
 
 ## Conventions
 - Path alias: `@/*` → `./src/*`
@@ -51,6 +49,5 @@ Social media video performance analyzer — users upload a video (or paste a URL
 
 ## Environment variables
 - `GEMINI_API_KEY` — Google Gemini API key (required for pipeline)
-- `N8N_WEBHOOK_SECRET` — optional bearer token for webhook auth
-- `APP_URL` — base URL override (defaults to request origin)
+- `SUPABASE_SERVICE_ROLE_KEY` — service role key for admin client (used by pipeline)
 - Supabase vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`

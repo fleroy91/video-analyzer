@@ -4,13 +4,13 @@ import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { PLATFORMS } from "@/lib/constants"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, CheckCircle2, XCircle, ArrowLeft } from "lucide-react"
+import { CheckCircle2, XCircle, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { KpiCard } from "./kpi-card"
 import { VideoCharacteristicsCard } from "./video-characteristics-card"
+import { PipelineProgress } from "./pipeline-progress"
 import type { Tables } from "@/types/database"
 
 interface ResultsDisplayProps {
@@ -131,27 +131,15 @@ export function ResultsDisplay({
 
       {/* Processing state */}
       {isProcessing && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Analyzing your video...
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Card className="border-border/60 bg-card/80 backdrop-blur-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Analyzing your video…</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Our AI is analyzing your video and predicting performance metrics.
-              This usually takes 1-2 minutes.
+              This usually takes 1–2 minutes.
             </p>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="space-y-3 rounded-lg border p-4">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-8 w-16" />
-                  <Skeleton className="h-2 w-full" />
-                </div>
-              ))}
-            </div>
+          </CardHeader>
+          <CardContent>
+            <PipelineProgress currentStep={request.pipeline_step} />
           </CardContent>
         </Card>
       )}

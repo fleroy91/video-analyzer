@@ -52,3 +52,14 @@ export const STATUS_LABELS: Record<string, string> = {
   completed: "Completed",
   failed: "Failed",
 }
+
+export const PIPELINE_STEPS = [
+  { key: "downloading", label: "Downloading video" },
+  { key: "uploading", label: "Uploading to Gemini" },
+  { key: "processing", label: "Processing video" },
+  { key: "extracting", label: "Extracting characteristics" },
+  { key: "scoring", label: "Scoring KPIs" },
+  { key: "saving", label: "Saving results" },
+] as const
+
+export type PipelineStep = (typeof PIPELINE_STEPS)[number]["key"]

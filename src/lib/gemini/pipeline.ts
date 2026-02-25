@@ -7,8 +7,12 @@
  *   3. Poll until ACTIVE
  *   4. Extract characteristics (video + prompt)
  *   5. Score KPIs (text-only prompt)
- *   6. POST results to callback URL
+ *   6. Save results directly to Supabase
  */
+
+import { createAdminClient } from "@/lib/supabase/admin"
+import type { Json } from "@/types/database"
+import type { PipelineStep } from "@/lib/constants"
 
 const GEMINI_BASE = "https://generativelanguage.googleapis.com"
 
@@ -160,31 +164,43 @@ function parseJson(text: string): Record<string, unknown> {
 }
 
 // ---------------------------------------------------------------------------
-// Step 6: Callback
+// Step 6: Save results to Supabase
 // ---------------------------------------------------------------------------
 
-async function postCallback(
-  callbackUrl: string,
+async function saveResults(
   requestId: string,
-  results: unknown[],
-  characteristics?: unknown,
+  results: { kpi_name: string; predicted_value: string; score: number; explanation?: string }[],
+  characteristics: Json,
 ): Promise<void> {
-  const webhookSecret = process.env.N8N_WEBHOOK_SECRET ?? ""
-  const headers: Record<string, string> = { "Content-Type": "application/json" }
-  if (webhookSecret) headers["Authorization"] = `Bearer ${webhookSecret}`
+  const supabase = createAdminClient()
 
-  const payload: Record<string, unknown> = { requestId, results }
-  if (characteristics) payload.characteristics = characteristics
+  const rows = results.map((r) => ({
+    request_id: requestId,
+    kpi_name: r.kpi_name,
+    predicted_value: r.predicted_value,
+    score: r.score,
+    explanation: r.explanation || null,
+  }))
 
-  const resp = await fetch(callbackUrl, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-  })
+  const { error: insertError } = await supabase
+    .from("analysis_results")
+    .insert(rows)
 
-  if (!resp.ok) {
-    const text = await resp.text()
-    throw new Error(`Callback failed (${resp.status}): ${text}`)
+  if (insertError) {
+    throw new Error(`Failed to insert results: ${insertError.message}`)
+  }
+
+  const { error: updateError } = await supabase
+    .from("analysis_requests")
+    .update({
+      status: "completed",
+      updated_at: new Date().toISOString(),
+      ...(characteristics ? { characteristics } : {}),
+    })
+    .eq("id", requestId)
+
+  if (updateError) {
+    throw new Error(`Failed to update request status: ${updateError.message}`)
   }
 }
 
@@ -199,11 +215,18 @@ export interface PipelineParams {
   targetAge: string
   targetGender: string
   targetTags: string[]
-  callbackUrl: string
+}
+
+async function updateStep(requestId: string, step: PipelineStep): Promise<void> {
+  const supabase = createAdminClient()
+  await supabase
+    .from("analysis_requests")
+    .update({ pipeline_step: step })
+    .eq("id", requestId)
 }
 
 export async function runGeminiPipeline(params: PipelineParams): Promise<void> {
-  const { requestId, videoUrl, platform, targetAge, targetGender, targetTags, callbackUrl } = params
+  const { requestId, videoUrl, platform, targetAge, targetGender, targetTags } = params
   const kpisStr = KPIS.join(", ")
   const tag = `[pipeline:${requestId.slice(0, 8)}]`
 
@@ -211,21 +234,25 @@ export async function runGeminiPipeline(params: PipelineParams): Promise<void> {
 
   // 1. Download
   console.log(`${tag} [1/5] Downloading video...`)
+  await updateStep(requestId, "downloading")
   const { data, mimeType } = await downloadVideo(videoUrl)
   console.log(`${tag}       ${(data.byteLength / 1024 / 1024).toFixed(1)} MB  (${mimeType})`)
 
   // 2. Upload
   console.log(`${tag} [2/5] Uploading to Gemini Files API...`)
+  await updateStep(requestId, "uploading")
   const { fileName, fileUri, fileMime } = await uploadToGemini(data, mimeType)
   console.log(`${tag}       → ${fileName}`)
 
   // 3. Wait
   console.log(`${tag} [3/5] Waiting for Gemini to process video...`)
+  await updateStep(requestId, "processing")
   await waitForActive(fileName)
   console.log(`${tag}       ready.`)
 
   // 4. Extract
   console.log(`${tag} [4/5] Extracting characteristics...`)
+  await updateStep(requestId, "extracting")
   const extractPrompt = `You are a social media video analysis expert.
 
 Target platform: ${platform}
@@ -282,6 +309,7 @@ Your response must be a raw JSON object. Do not use markdown, do not wrap in cod
 
   // 5. Score KPIs
   console.log(`${tag} [5/5] Scoring KPIs...`)
+  await updateStep(requestId, "scoring")
   const tagsStr = Array.isArray(analysis.tags)
     ? (analysis.tags as string[]).join(", ")
     : "N/A"
@@ -319,8 +347,13 @@ Your response must be a raw JSON object. Do not use markdown, do not wrap in cod
   const scoreText = await geminiGenerate(scorePrompt)
   const scoring = parseJson(scoreText)
 
-  // 6. Callback
-  console.log(`${tag} Posting results to callback...`)
-  await postCallback(callbackUrl, requestId, scoring.results as unknown[], analysis)
+  // 6. Save to Supabase
+  console.log(`${tag} Saving results to Supabase...`)
+  await updateStep(requestId, "saving")
+  await saveResults(
+    requestId,
+    scoring.results as { kpi_name: string; predicted_value: string; score: number; explanation?: string }[],
+    analysis as Json,
+  )
   console.log(`${tag} Done!`)
 }

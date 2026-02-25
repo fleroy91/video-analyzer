@@ -62,12 +62,8 @@ export async function POST(request: Request) {
     const { id: requestId } = analysisRequest
     console.log(`[analyze] Request created — id=${requestId} (${Date.now() - start}ms)`)
 
-    const { origin } = new URL(request.url)
-    const appUrl = process.env.APP_URL ?? origin
-    const callbackUrl = `${appUrl}/api/webhook/results`
-
-    // Fire-and-forget: run pipeline directly, no HTTP hop
-    runGeminiPipeline({ requestId, videoUrl, platform, targetAge, targetGender, targetTags, callbackUrl })
+    // Fire-and-forget: run pipeline directly, saves results to Supabase
+    runGeminiPipeline({ requestId, videoUrl, platform, targetAge, targetGender, targetTags })
       .catch(async (err) => {
         console.error(`[analyze] Pipeline failed for ${requestId}:`, err)
         await supabase
