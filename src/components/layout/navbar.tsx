@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Upload, History, Menu, X } from "lucide-react"
@@ -28,7 +29,7 @@ export function Navbar() {
             className="flex items-center gap-2 font-display font-bold text-lg tracking-tight"
           >
             {/* Logo mark */}
-            <img src="/logo-abstract-tech.svg" alt="VideoAnalyzer Logo" className="h-7 w-7" />
+            <Image src="/logo-abstract-tech.svg" alt="VideoAnalyzer Logo" width={28} height={28} className="h-7 w-7" />
             <span className="gradient-text hidden sm:inline">VideoAnalyzer</span>
           </Link>
           <Separator orientation="vertical" className="hidden h-5 sm:block opacity-30" />

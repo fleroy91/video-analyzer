@@ -1,15 +1,20 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { analyzeApiSchema } from "@/lib/validators"
+import { runGeminiPipeline } from "@/lib/gemini/pipeline"
 
 export async function POST(request: Request) {
+  const start = Date.now()
+  console.log("[analyze] POST received")
+
   try {
     const body = await request.json()
     const parsed = analyzeApiSchema.safeParse(body)
 
     if (!parsed.success) {
+      console.warn("[analyze] Invalid request body:", parsed.error.issues)
       return NextResponse.json(
-        { error: "Invalid request", details: parsed.error.flatten() },
+        { error: "Invalid request", details: parsed.error.issues },
         { status: 400 }
       )
     }
@@ -20,13 +25,17 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser()
 
     if (!user) {
+      console.warn("[analyze] Unauthenticated request")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const { videoUrl, videoSource, platform, targetAge, targetGender, targetTags } =
       parsed.data
 
-    // Create analysis request record (status starts as "processing")
+    console.log(`[analyze] user=${user.email} platform=${platform} source=${videoSource}`)
+    console.log(`[analyze] videoUrl=${videoUrl.slice(0, 80)}`)
+
+    // Create analysis request record
     const { data: analysisRequest, error: insertError } = await supabase
       .from("analysis_requests")
       .insert({
@@ -43,36 +52,34 @@ export async function POST(request: Request) {
       .single()
 
     if (insertError) {
+      console.error("[analyze] DB insert failed:", insertError.message)
       return NextResponse.json(
         { error: "Failed to create analysis request" },
         { status: 500 }
       )
     }
 
-    // Derive base URL from the incoming request so it works in every environment
+    const { id: requestId } = analysisRequest
+    console.log(`[analyze] Request created — id=${requestId} (${Date.now() - start}ms)`)
+
     const { origin } = new URL(request.url)
     const appUrl = process.env.APP_URL ?? origin
+    const callbackUrl = `${appUrl}/api/webhook/results`
 
-    // Fire-and-forget: trigger the worker (TypeScript Gemini pipeline)
-    fetch(`${appUrl}/api/analyze/worker`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        requestId: analysisRequest.id,
-        videoUrl,
-        platform,
-        targetAge,
-        targetGender,
-        targetTags,
-        callbackUrl: `${appUrl}/api/webhook/results`,
-      }),
-    }).catch((err) => console.error("[analyze] Failed to trigger worker:", err))
+    // Fire-and-forget: run pipeline directly, no HTTP hop
+    runGeminiPipeline({ requestId, videoUrl, platform, targetAge, targetGender, targetTags, callbackUrl })
+      .catch(async (err) => {
+        console.error(`[analyze] Pipeline failed for ${requestId}:`, err)
+        await supabase
+          .from("analysis_requests")
+          .update({ status: "failed", error_message: String(err) })
+          .eq("id", requestId)
+      })
 
-    return NextResponse.json({ requestId: analysisRequest.id })
-  } catch {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
+    console.log(`[analyze] Pipeline launched — responding in ${Date.now() - start}ms`)
+    return NextResponse.json({ requestId })
+  } catch (err) {
+    console.error("[analyze] Unexpected error:", err)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
