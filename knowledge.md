@@ -8,6 +8,7 @@ Social media video performance analyzer — users upload a video (or paste a URL
 - **Styling:** Tailwind CSS v4, shadcn/ui (Radix primitives + CVA)
 - **Auth & DB:** Supabase (Auth, Postgres, Storage, Realtime)
 - **AI:** Google Gemini 2.5 Flash via REST (Files API upload → generateContent)
+- **Background Jobs:** Inngest (durable multi-step functions)
 - **Forms:** react-hook-form + zod validation
 - **Package manager:** Yarn 1.x
 
@@ -35,8 +36,8 @@ Social media video performance analyzer — users upload a video (or paste a URL
 
 ## Data flow
 1. User submits video via `/analyze` form
-2. `POST /api/analyze` creates an `analysis_requests` row (status: processing), then fire-and-forgets `runGeminiPipeline`
-3. Pipeline: download video → upload to Gemini Files API → poll until ACTIVE → extract characteristics → score KPIs → save results directly to Supabase
+2. `POST /api/analyze` creates an `analysis_requests` row (status: processing), then sends an Inngest event
+3. Inngest runs the pipeline as durable steps: download video → upload to Gemini Files API → poll until ACTIVE → extract characteristics → score KPIs → save results to Supabase
 4. Frontend receives updates via Supabase Realtime (pipeline step progress + results) on `/results/[id]`
 
 ## Conventions
@@ -51,4 +52,6 @@ Social media video performance analyzer — users upload a video (or paste a URL
 - `GEMINI_API_KEY` — Google Gemini API key (required for pipeline)
 - `SUPABASE_SERVICE_ROLE_KEY` — service role key for admin client (used by pipeline)
 - `NEXT_PUBLIC_GRAFANA_FARO_URL` — Grafana Faro collector URL for frontend observability (optional)
+- `INNGEST_EVENT_KEY` — Inngest event key for sending events (required for production)
+- `INNGEST_SIGNING_KEY` — Inngest signing key for verifying webhook requests (required for production)
 - Supabase vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`

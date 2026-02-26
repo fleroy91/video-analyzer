@@ -1,10 +1,7 @@
-import { after, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { analyzeApiSchema } from "@/lib/validators"
-import { runGeminiPipeline } from "@/lib/gemini/pipeline"
-
-export const maxDuration = 300
+import { inngest } from "@/lib/inngest/client"
 
 export async function POST(request: Request) {
   const start = Date.now()
@@ -65,21 +62,13 @@ export async function POST(request: Request) {
     const { id: requestId } = analysisRequest
     console.log(`[analyze] Request created — id=${requestId} (${Date.now() - start}ms)`)
 
-    // Run pipeline after response is sent (keeps serverless function alive on Vercel)
-    after(async () => {
-      try {
-        await runGeminiPipeline({ requestId, videoUrl, platform, targetAge, targetGender, targetTags })
-      } catch (err) {
-        console.error(`[analyze] Pipeline failed for ${requestId}:`, err)
-        const admin = createAdminClient()
-        await admin
-          .from("analysis_requests")
-          .update({ status: "failed", error_message: String(err) })
-          .eq("id", requestId)
-      }
+    // Send event to Inngest for durable background processing
+    await inngest.send({
+      name: "video/analyze.requested",
+      data: { requestId, videoUrl, platform, targetAge, targetGender, targetTags },
     })
 
-    console.log(`[analyze] Pipeline launched — responding in ${Date.now() - start}ms`)
+    console.log(`[analyze] Inngest event sent — responding in ${Date.now() - start}ms`)
     return NextResponse.json({ requestId })
   } catch (err) {
     console.error("[analyze] Unexpected error:", err)
