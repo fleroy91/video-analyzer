@@ -36,7 +36,8 @@ export async function proxy(request: NextRequest) {
     !user &&
     !pathname.startsWith("/sign-in") &&
     !pathname.startsWith("/sign-up") &&
-    !pathname.startsWith("/api/webhook")
+    !pathname.startsWith("/api/webhook") &&
+    !pathname.startsWith("/api/inngest")
   ) {
     const url = request.nextUrl.clone()
     url.pathname = "/sign-in"
